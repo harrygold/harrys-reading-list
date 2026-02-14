@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harry's Reading List</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header / About Section -->
+  <header class="site-header">
+    <div class="header-content">
+      <div class="header-text">
+        <h1>Harry's Reading List</h1>
+        <p class="reading-philosophy">"Read what you love until you love to read." — Naval Ravikant</p>
+        <details class="about-details">
+          <summary>About Harry Gold</summary>
+          <p>Harry is an eclectic reader. His library spans biography and memoir (especially music memoirs — Springsteen, Dylan, Bono, Flea, Dave Grohl), philosophy and spirituality (Ram Dass, Krishnamurti, Pema Chodron), business and tech (Naval Ravikant, Tim Ferriss, Chris Dixon), classic and contemporary fiction (Garcia Marquez, Ishiguro, Philip K. Dick), history (Rome, Medici, Congo), and art. He often discovers books through recommendations from people like Patrick Collison, Joe Rogan, Chamath Palihapitiya, Marc Andreessen, Rick Rubin, and friends. He reads across physical books, Kindle, and audiobooks.</p>
+          <p>A native Californian, Harry is a world traveler, an oil painter, a shark diver, and a soup maker.</p>
+        </details>
+      </div>
+      <div class="header-stats" id="headerStats"></div>
+    </div>
+  </header>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-content">
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Search books...">
+      </div>
+      <div class="toolbar-actions">
+        <div class="filter-group">
+          <div class="filter-pill" id="filterGenrePill" data-filter="genre">
+            Genre <span class="pill-arrow">&#9662;</span>
+            <div class="filter-dropdown" id="filterGenreDropdown"></div>
+          </div>
+          <div class="filter-pill" id="filterStatusPill" data-filter="status">
+            Status <span class="pill-arrow">&#9662;</span>
+            <div class="filter-dropdown" id="filterStatusDropdown">
+              <button class="filter-dropdown-item" data-value="">All Statuses</button>
+              <button class="filter-dropdown-item" data-value="reading">Currently Reading</button>
+              <button class="filter-dropdown-item" data-value="owned">Owned / To Read</button>
+              <button class="filter-dropdown-item" data-value="want-to-buy">Want to Buy</button>
+              <button class="filter-dropdown-item" data-value="paused">Paused</button>
+              <button class="filter-dropdown-item" data-value="completed">Completed</button>
+            </div>
+          </div>
+          <div class="filter-pill" id="filterFormatPill" data-filter="format">
+            Format <span class="pill-arrow">&#9662;</span>
+            <div class="filter-dropdown" id="filterFormatDropdown">
+              <button class="filter-dropdown-item" data-value="">All Formats</button>
+              <button class="filter-dropdown-item" data-value="Physical (New)">Physical (New)</button>
+              <button class="filter-dropdown-item" data-value="Physical (Used)">Physical (Used)</button>
+              <button class="filter-dropdown-item" data-value="Digital/Kindle">Digital/Kindle</button>
+              <button class="filter-dropdown-item" data-value="Audiobook">Audiobook</button>
+            </div>
+          </div>
+          <div class="filter-pill" id="filterRatingPill" data-filter="rating">
+            Rating <span class="pill-arrow">&#9662;</span>
+            <div class="filter-dropdown" id="filterRatingDropdown">
+              <button class="filter-dropdown-item" data-value="">All Ratings</button>
+              <button class="filter-dropdown-item" data-value="5">5 Stars</button>
+              <button class="filter-dropdown-item" data-value="4">4 Stars</button>
+              <button class="filter-dropdown-item" data-value="3">3 Stars</button>
+              <button class="filter-dropdown-item" data-value="2">2 Stars</button>
+              <button class="filter-dropdown-item" data-value="1">1 Star</button>
+              <button class="filter-dropdown-item" data-value="none">Unrated</button>
+            </div>
+          </div>
+          <div class="filter-pill" id="sortByPill" data-filter="sort">
+            Sort <span class="pill-arrow">&#9662;</span>
+            <div class="filter-dropdown" id="sortByDropdown">
+              <button class="filter-dropdown-item selected" data-value="dateAdded">Date Added</button>
+              <button class="filter-dropdown-item" data-value="title">Title</button>
+              <button class="filter-dropdown-item" data-value="author">Author</button>
+              <button class="filter-dropdown-item" data-value="rating">Rating</button>
+              <button class="filter-dropdown-item" data-value="yearPublished">Year Published</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="addBookBtn">+ Add Book</button>
+        <div class="overflow-menu-container">
+          <button class="overflow-btn" id="overflowBtn" title="More actions">&#8943;</button>
+          <div class="overflow-dropdown" id="overflowDropdown">
+            <button id="importBtn">Import</button>
+            <button id="exportBtn">Export</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Favorites Section -->
+    <section class="book-section favorites-section" id="favoritesSection">
+      <h2 class="section-title">Top Picks</h2>
+      <div class="book-grid" id="favoritesGrid"></div>
+    </section>
+
+    <!-- Currently Reading -->
+    <section class="book-section" id="readingSection">
+      <h2 class="section-title">Currently Reading</h2>
+      <div class="book-grid" id="readingGrid"></div>
+    </section>
+
+    <!-- Owned / To Read -->
+    <section class="book-section" id="ownedSection">
+      <h2 class="section-title">Owned / To Read</h2>
+      <div class="book-grid" id="ownedGrid"></div>
+    </section>
+
+    <!-- Want to Buy -->
+    <section class="book-section" id="wantToBuySection">
+      <h2 class="section-title">Want to Buy</h2>
+      <div class="book-grid" id="wantToBuyGrid"></div>
+    </section>
+
+    <!-- Paused -->
+    <section class="book-section" id="pausedSection">
+      <h2 class="section-title">Paused</h2>
+      <div class="book-grid" id="pausedGrid"></div>
+    </section>
+
+    <!-- Completed -->
+    <section class="book-section" id="completedSection">
+      <h2 class="section-title">Completed</h2>
+      <div class="book-grid" id="completedGrid"></div>
+    </section>
+  </main>
+
+  <!-- Book Detail Modal -->
+  <div class="modal-overlay" id="bookDetailModal">
+    <div class="modal">
+      <button class="modal-close" id="closeDetailModal">&times;</button>
+      <div class="modal-body" id="bookDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Book Modal -->
+  <div class="modal-overlay" id="bookFormModal">
+    <div class="modal modal-form">
+      <button class="modal-close" id="closeFormModal">&times;</button>
+      <h2 id="formModalTitle">Add Book</h2>
+
+      <!-- Open Library Search -->
+      <div class="ol-search">
+        <input type="text" id="olSearchInput" placeholder="Search Open Library to auto-fill...">
+        <button class="btn btn-subtle" id="olSearchBtn">Search</button>
+      </div>
+      <div class="ol-results" id="olResults"></div>
+
+      <form id="bookForm">
+        <input type="hidden" id="formBookId">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formTitle">Title *</label>
+            <input type="text" id="formTitle" required>
+          </div>
+          <div class="form-group">
+            <label for="formAuthor">Author *</label>
+            <input type="text" id="formAuthor" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formGenre">Genre</label>
+            <select id="formGenre">
+              <option value="">Select genre...</option>
+              <option>Art</option>
+              <option>Artificial Intelligence</option>
+              <option>Biography</option>
+              <option>Business</option>
+              <option>Classics</option>
+              <option>Comics / Graphic Novels</option>
+              <option>Cookbook</option>
+              <option>Creativity</option>
+              <option>Cryptocurrency</option>
+              <option>Design</option>
+              <option>Fairy Tale</option>
+              <option>Fantasy</option>
+              <option>Fiction</option>
+              <option>Food</option>
+              <option>Health</option>
+              <option>History</option>
+              <option>Horror</option>
+              <option>Humor</option>
+              <option>Leadership / Management</option>
+              <option>Marine Life / Ocean</option>
+              <option>Military History</option>
+              <option>Money</option>
+              <option>Music</option>
+              <option>Mystery</option>
+              <option>Non-Fiction</option>
+              <option>Novel</option>
+              <option>Personal Development</option>
+              <option>Philosophy</option>
+              <option>Poetry</option>
+              <option>Politics / Current Affairs</option>
+              <option>Psychology</option>
+              <option>Real Estate Investing</option>
+              <option>Religion and Spirituality</option>
+              <option>Romance</option>
+              <option>Science</option>
+              <option>Science Fiction</option>
+              <option>Self-Help</option>
+              <option>Technology</option>
+              <option>Thriller</option>
+              <option>Travel</option>
+              <option>True Crime</option>
+              <option>UX</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="formYear">Year Published</label>
+            <input type="number" id="formYear">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formPages">Page Count</label>
+            <input type="number" id="formPages">
+          </div>
+          <div class="form-group">
+            <label for="formFormat">Format</label>
+            <select id="formFormat">
+              <option value="">Select format...</option>
+              <option>Physical (New)</option>
+              <option>Physical (Used)</option>
+              <option>Digital/Kindle</option>
+              <option>Audiobook</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formStatus">Status</label>
+            <select id="formStatus">
+              <option value="want-to-buy">Want to Buy</option>
+              <option value="owned">Owned / To Read</option>
+              <option value="reading">Currently Reading</option>
+              <option value="paused">Paused</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="formRating">Rating (1-5)</label>
+            <select id="formRating">
+              <option value="">No rating</option>
+              <option value="5">5 Stars</option>
+              <option value="4">4 Stars</option>
+              <option value="3">3 Stars</option>
+              <option value="2">2 Stars</option>
+              <option value="1">1 Star</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formCover">Cover Image URL</label>
+            <input type="url" id="formCover" placeholder="https://...">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formDatePurchased">Date Purchased</label>
+            <input type="date" id="formDatePurchased">
+          </div>
+          <div class="form-group">
+            <label for="formDateStarted">Date Started</label>
+            <input type="date" id="formDateStarted">
+          </div>
+          <div class="form-group">
+            <label for="formDateCompleted">Date Completed</label>
+            <input type="date" id="formDateCompleted">
+          </div>
+        </div>
+        <div class="form-row" id="progressRow">
+          <div class="form-group">
+            <label for="formCurrentPage">Current Page</label>
+            <input type="number" id="formCurrentPage" min="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formRecommendedBy">Recommended By</label>
+            <input type="text" id="formRecommendedBy" placeholder="e.g. Joe Rogan, a friend...">
+          </div>
+          <div class="form-group">
+            <label for="formTags">Tags (comma separated)</label>
+            <input type="text" id="formTags" placeholder="e.g. favorites, book club, gifted to me">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="formDescription">Description</label>
+          <textarea id="formDescription" rows="2" placeholder="What's this book about?"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="formNotes">Notes</label>
+          <textarea id="formNotes" rows="3" placeholder="Your personal notes..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="formFavorite"> Mark as Top Pick / Favorite
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-subtle" id="cancelFormBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBookBtn">Save Book</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal modal-small">
+      <button class="modal-close" id="closeImportModal">&times;</button>
+      <h2>Import Books</h2>
+      <p>Paste your JSON data below, or select a JSON file.</p>
+      <input type="file" id="importFile" accept=".json">
+      <textarea id="importTextarea" rows="6" placeholder="Or paste JSON here..."></textarea>
+      <div class="import-options">
+        <label class="checkbox-label">
+          <input type="checkbox" id="importReplace"> Replace all existing data
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-subtle" id="cancelImportBtn">Cancel</button>
+        <button class="btn btn-primary" id="doImportBtn">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p>Built with care using Claude Code</p>
+  </footer>
+
+  <script src="seed-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
