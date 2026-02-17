@@ -7,11 +7,11 @@
 
   const STORAGE_KEY = 'harrys-reading-list';
   const STATUS_LABELS = {
-    'want-to-buy': 'Want to Buy',
-    'owned': 'Owned / To Read',
+    'wishlist': 'Wishlist',
+    'up-next': 'Up Next',
     'reading': 'Currently Reading',
-    'paused': 'Paused',
-    'completed': 'Completed'
+    'on-hold': 'On Hold',
+    'finished': 'Finished'
   };
 
   // Book icon SVG for placeholder covers
@@ -29,6 +29,72 @@
     sort: 'dateAdded'
   };
 
+  // View state
+  let currentView = localStorage.getItem('reading-list-view') || 'grid';
+
+  // List view sort state (independent of filter sort)
+  let listSortState = { column: 'title', direction: 'asc' };
+
+  // Cover image cache
+  const COVER_CACHE_KEY = 'reading-list-covers';
+
+  function loadCoverCache() {
+    try {
+      return JSON.parse(localStorage.getItem(COVER_CACHE_KEY)) || {};
+    } catch { return {}; }
+  }
+
+  function saveCoverCache(cache) {
+    localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(cache));
+  }
+
+  async function fetchCoverForBook(book) {
+    const cache = loadCoverCache();
+    const cacheKey = `${book.title}|||${book.author}`;
+    if (cacheKey in cache) return cache[cacheKey];
+
+    let url = null;
+
+    // Strategy 1: Open Library — title + author
+    try {
+      const resp = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(book.title)}&author=${encodeURIComponent(book.author)}&limit=1`);
+      const data = await resp.json();
+      if (data.docs && data.docs.length > 0 && data.docs[0].cover_edition_key) {
+        url = `https://covers.openlibrary.org/b/olid/${data.docs[0].cover_edition_key}-M.jpg`;
+      }
+    } catch { /* continue */ }
+
+    // Strategy 2: Open Library — title only
+    if (!url) {
+      try {
+        const resp = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(book.title)}&limit=1`);
+        const data = await resp.json();
+        if (data.docs && data.docs.length > 0 && data.docs[0].cover_edition_key) {
+          url = `https://covers.openlibrary.org/b/olid/${data.docs[0].cover_edition_key}-M.jpg`;
+        }
+      } catch { /* continue */ }
+    }
+
+    // Strategy 3: Google Books API
+    if (!url) {
+      try {
+        const q = `intitle:${encodeURIComponent(book.title)}+inauthor:${encodeURIComponent(book.author)}`;
+        const resp = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1`);
+        const data = await resp.json();
+        if (data.items && data.items.length > 0) {
+          const imageLinks = data.items[0].volumeInfo?.imageLinks;
+          if (imageLinks) {
+            url = (imageLinks.thumbnail || imageLinks.smallThumbnail || '').replace('http://', 'https://');
+          }
+        }
+      } catch { /* continue */ }
+    }
+
+    cache[cacheKey] = url;
+    saveCoverCache(cache);
+    return url;
+  }
+
   // ---- Initialization ----
 
   async function init() {
@@ -42,6 +108,10 @@
     }
 
     populateGenreFilter();
+    // Set initial view toggle state
+    document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === currentView);
+    });
     renderAll();
     updateStats();
     bindEvents();
@@ -67,19 +137,29 @@
   function renderAll() {
     const filtered = getFilteredBooks();
 
-    const favorites = filtered.filter(b => b.favorite && b.status === 'completed');
+    const favorites = filtered.filter(b => b.favorite && b.status === 'finished');
     const reading = filtered.filter(b => b.status === 'reading');
-    const owned = filtered.filter(b => b.status === 'owned');
-    const wantToBuy = filtered.filter(b => b.status === 'want-to-buy');
-    const paused = filtered.filter(b => b.status === 'paused');
-    const completed = filtered.filter(b => b.status === 'completed' && !b.favorite);
+    const owned = filtered.filter(b => b.status === 'up-next');
+    const wantToBuy = filtered.filter(b => b.status === 'wishlist');
+    const paused = filtered.filter(b => b.status === 'on-hold');
+    const completed = filtered.filter(b => b.status === 'finished' && !b.favorite);
 
-    renderGrid('favoritesGrid', favorites, 'No favorites yet');
-    renderGrid('readingGrid', reading, 'Nothing currently being read');
-    renderGrid('ownedGrid', owned, 'No books in this category');
-    renderGrid('wantToBuyGrid', wantToBuy, 'No books in this category');
-    renderGrid('pausedGrid', paused, 'No paused books');
-    renderGrid('completedGrid', completed, 'No completed books');
+    const renderFn = currentView === 'list' ? renderList : renderGrid;
+
+    renderFn('favoritesGrid', favorites, 'No favorites yet');
+    renderFn('readingGrid', reading, 'Nothing currently being read');
+    renderFn('ownedGrid', owned, 'No books in this category');
+    renderFn('wantToBuyGrid', wantToBuy, 'No books in this category');
+    renderFn('pausedGrid', paused, 'No books on hold');
+    renderFn('completedGrid', completed, 'No finished books');
+
+    // Update section counts
+    updateSectionCount('favoritesSection', favorites.length);
+    updateSectionCount('readingSection', reading.length);
+    updateSectionCount('ownedSection', owned.length);
+    updateSectionCount('wantToBuySection', wantToBuy.length);
+    updateSectionCount('pausedSection', paused.length);
+    updateSectionCount('completedSection', completed.length);
 
     // Show/hide sections
     toggleSection('favoritesSection', favorites.length);
@@ -88,6 +168,89 @@
     toggleSection('wantToBuySection', wantToBuy.length);
     toggleSection('pausedSection', paused.length);
     toggleSection('completedSection', completed.length);
+
+    updateClearFiltersButton();
+
+    // Lazy-load covers for cards missing them (grid view only)
+    if (currentView === 'grid') {
+      lazyLoadCovers();
+    }
+  }
+
+  function updateSectionCount(sectionId, count) {
+    const section = document.getElementById(sectionId);
+    const title = section.querySelector('.section-title');
+    const baseName = title.dataset.baseName || title.textContent.replace(/\s*\(\d+\)$/, '');
+    title.dataset.baseName = baseName;
+    title.innerHTML = `${baseName} <span class="section-count">(${count})</span>`;
+  }
+
+  function updateClearFiltersButton() {
+    const btn = document.getElementById('clearFiltersBtn');
+    const active = isFilterActive() || filterState.sort !== 'dateAdded';
+    btn.style.display = active ? '' : 'none';
+  }
+
+  function clearAllFilters() {
+    filterState.genre = '';
+    filterState.status = '';
+    filterState.format = '';
+    filterState.rating = '';
+    filterState.sort = 'dateAdded';
+    document.getElementById('searchInput').value = '';
+
+    // Reset all pill labels and states
+    const defaults = { filterGenrePill: 'Genre', filterStatusPill: 'Status', filterFormatPill: 'Format', filterRatingPill: 'Rating', sortByPill: 'Sort' };
+    Object.entries(defaults).forEach(([pillId, label]) => {
+      const pill = document.getElementById(pillId);
+      pill.classList.remove('active');
+      pill.childNodes[0].textContent = label + ' ';
+    });
+
+    // Reset selected states in all dropdowns
+    document.querySelectorAll('.filter-dropdown-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    // Re-select the "Date Added" sort default
+    const sortDropdown = document.getElementById('sortByDropdown');
+    const dateAddedItem = sortDropdown.querySelector('[data-value="dateAdded"]');
+    if (dateAddedItem) dateAddedItem.classList.add('selected');
+
+    renderAll();
+  }
+
+  function lazyLoadCovers() {
+    const cards = document.querySelectorAll('[data-needs-cover="true"]');
+    if (cards.length === 0) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const card = entry.target;
+          observer.unobserve(card);
+          const bookId = card.dataset.id;
+          const book = books.find(b => b.id === bookId);
+          if (!book) return;
+          fetchCoverForBook(book).then(url => {
+            if (url) {
+              const coverDiv = card.querySelector('.book-card-cover');
+              if (coverDiv) {
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = book.title;
+                img.loading = 'lazy';
+                img.onerror = function() { this.remove(); };
+                const placeholder = coverDiv.querySelector('.placeholder-cover');
+                if (placeholder) placeholder.replaceWith(img);
+              }
+            }
+            card.removeAttribute('data-needs-cover');
+          });
+        }
+      });
+    }, { rootMargin: '200px' });
+
+    cards.forEach(card => observer.observe(card));
   }
 
   function toggleSection(id, count) {
@@ -110,15 +273,24 @@
 
   function renderGrid(gridId, bookList, emptyMsg) {
     const grid = document.getElementById(gridId);
+    grid.classList.remove('empty', 'list-view-active');
+    grid.removeAttribute('data-empty-message');
+
     if (bookList.length === 0) {
-      grid.innerHTML = '';
-      grid.classList.add('empty');
-      grid.setAttribute('data-empty-message', emptyMsg);
+      if (isFilterActive()) {
+        grid.innerHTML = '<div class="empty-state">No books match your filters. <a href="#" class="clear-filters-link">Clear filters</a></div>';
+        grid.querySelector('.clear-filters-link').addEventListener('click', (e) => {
+          e.preventDefault();
+          clearAllFilters();
+        });
+      } else {
+        grid.innerHTML = '';
+        grid.classList.add('empty');
+        grid.setAttribute('data-empty-message', emptyMsg);
+      }
       return;
     }
 
-    grid.classList.remove('empty');
-    grid.removeAttribute('data-empty-message');
     grid.innerHTML = bookList.map(book => createBookCard(book)).join('');
 
     // Bind click events
@@ -127,22 +299,128 @@
     });
   }
 
+  function renderList(gridId, bookList, emptyMsg) {
+    const grid = document.getElementById(gridId);
+    grid.classList.remove('empty');
+    grid.removeAttribute('data-empty-message');
+    grid.classList.add('list-view-active');
+
+    if (bookList.length === 0) {
+      if (isFilterActive()) {
+        grid.innerHTML = '<div class="empty-state">No books match your filters. <a href="#" class="clear-filters-link">Clear filters</a></div>';
+        grid.querySelector('.clear-filters-link').addEventListener('click', (e) => {
+          e.preventDefault();
+          clearAllFilters();
+        });
+      } else {
+        grid.innerHTML = '';
+        grid.classList.add('empty');
+        grid.setAttribute('data-empty-message', emptyMsg);
+      }
+      return;
+    }
+
+    // Sort list by listSortState
+    const sorted = [...bookList].sort((a, b) => {
+      let cmp = 0;
+      switch (listSortState.column) {
+        case 'title': cmp = (a.title || '').localeCompare(b.title || ''); break;
+        case 'author': cmp = (a.author || '').localeCompare(b.author || ''); break;
+        case 'genre': cmp = (a.genre || '').localeCompare(b.genre || ''); break;
+        case 'rating': cmp = (a.rating || 0) - (b.rating || 0); break;
+        case 'status': cmp = (a.status || '').localeCompare(b.status || ''); break;
+        case 'format': cmp = (a.format || '').localeCompare(b.format || ''); break;
+        default: cmp = (a.title || '').localeCompare(b.title || '');
+      }
+      return listSortState.direction === 'desc' ? -cmp : cmp;
+    });
+
+    const arrow = (col) => {
+      if (listSortState.column !== col) return '';
+      return listSortState.direction === 'asc' ? ' &#9650;' : ' &#9660;';
+    };
+    const activeClass = (col) => listSortState.column === col ? ' sort-active' : '';
+
+    let html = `<table class="book-list-table">
+      <thead><tr>
+        <th class="book-list-col-title${activeClass('title')}" data-sort-col="title">Title${arrow('title')}</th>
+        <th class="book-list-col-author${activeClass('author')}" data-sort-col="author">Author${arrow('author')}</th>
+        <th class="book-list-col-genre${activeClass('genre')}" data-sort-col="genre">Genre${arrow('genre')}</th>
+        <th class="book-list-col-rating${activeClass('rating')}" data-sort-col="rating">Rating${arrow('rating')}</th>
+        <th class="book-list-col-status${activeClass('status')}" data-sort-col="status">Status${arrow('status')}</th>
+        <th class="book-list-col-format${activeClass('format')}" data-sort-col="format">Format${arrow('format')}</th>
+      </tr></thead><tbody>`;
+
+    sorted.forEach(book => {
+      const ratingStr = book.rating ? starsHtml(book.rating) : '<span style="color:var(--color-text-muted)">—</span>';
+      const statusLabel = STATUS_LABELS[book.status] || book.status;
+      html += `<tr class="book-list-row" data-id="${book.id}">
+        <td class="book-list-col-title">${escapeHtml(book.title)}</td>
+        <td class="book-list-col-author">${escapeHtml(book.author)}</td>
+        <td class="book-list-col-genre">${escapeHtml(book.genre || '')}</td>
+        <td class="book-list-col-rating">${ratingStr}</td>
+        <td class="book-list-col-status"><span class="book-list-status-badge">${escapeHtml(statusLabel)}</span></td>
+        <td class="book-list-col-format">${escapeHtml(book.format || '')}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    grid.innerHTML = html;
+
+    // Bind row clicks
+    grid.querySelectorAll('.book-list-row').forEach(row => {
+      row.addEventListener('click', () => showBookDetail(row.dataset.id));
+    });
+
+    // Bind column header clicks for sorting
+    grid.querySelectorAll('th[data-sort-col]').forEach(header => {
+      header.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const col = header.dataset.sortCol;
+        if (listSortState.column === col) {
+          listSortState.direction = listSortState.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+          listSortState.column = col;
+          listSortState.direction = 'asc';
+        }
+        renderAll();
+      });
+    });
+  }
+
   function createBookCard(book) {
-    const coverHtml = book.coverImage
-      ? `<img src="${escapeHtml(book.coverImage)}" alt="${escapeHtml(book.title)}" loading="lazy" onerror="this.parentElement.innerHTML='${placeholderCoverInline()}'">`
-      : `<div class="placeholder-cover">${BOOK_ICON_SVG}</div>`;
+    let needsCover = false;
+    let coverHtml;
+
+    if (book.coverImage) {
+      coverHtml = `<img src="${escapeHtml(book.coverImage)}" alt="${escapeHtml(book.title)}" loading="lazy" onerror="this.parentElement.innerHTML='${placeholderCoverInline()}'">`;
+    } else {
+      // Check cover cache
+      const cache = loadCoverCache();
+      const cacheKey = `${book.title}|||${book.author}`;
+      if (cacheKey in cache && cache[cacheKey]) {
+        coverHtml = `<img src="${escapeHtml(cache[cacheKey])}" alt="${escapeHtml(book.title)}" loading="lazy" onerror="this.parentElement.innerHTML='${placeholderCoverInline()}'">`;
+      } else if (!(cacheKey in cache)) {
+        coverHtml = `<div class="placeholder-cover">${BOOK_ICON_SVG}</div>`;
+        needsCover = true;
+      } else {
+        coverHtml = `<div class="placeholder-cover">${BOOK_ICON_SVG}</div>`;
+      }
+    }
 
     const formatBadge = book.format
       ? `<span class="format-badge">${formatIcon(book.format)}</span>`
       : '';
 
+    const genreHtml = book.genre ? `<span class="book-card-genre">${escapeHtml(book.genre)}</span>` : '';
+
     let ratingHtml = '';
-    if (book.status === 'completed' && book.rating) {
+    if (book.status === 'finished' && book.rating) {
       ratingHtml = `<div class="book-card-rating">${starsHtml(book.rating)}</div>`;
     }
 
     let progressHtml = '';
-    if ((book.status === 'reading' || book.status === 'paused') && book.currentPage && book.pageCount) {
+    if ((book.status === 'reading' || book.status === 'on-hold') && book.currentPage && book.pageCount) {
       const pct = Math.min(100, Math.round((book.currentPage / book.pageCount) * 100));
       progressHtml = `
         <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
@@ -150,7 +428,7 @@
     }
 
     return `
-      <div class="book-card" data-id="${book.id}">
+      <div class="book-card" data-id="${book.id}"${needsCover ? ' data-needs-cover="true"' : ''}>
         <div class="book-card-cover">
           ${coverHtml}
           ${formatBadge}
@@ -158,6 +436,7 @@
         <div class="book-card-info">
           <div class="book-card-title">${escapeHtml(book.title)}</div>
           <div class="book-card-author">${escapeHtml(book.author)}</div>
+          ${genreHtml}
           ${ratingHtml}
           ${progressHtml}
         </div>
@@ -191,7 +470,7 @@
   function updateStats() {
     const stats = document.getElementById('headerStats');
     const total = books.length;
-    const completed = books.filter(b => b.status === 'completed').length;
+    const completed = books.filter(b => b.status === 'finished').length;
     const reading = books.filter(b => b.status === 'reading').length;
 
     stats.innerHTML = `
@@ -310,6 +589,8 @@
     document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('open'));
     const overflowDropdown = document.getElementById('overflowDropdown');
     if (overflowDropdown) overflowDropdown.classList.remove('open');
+    const ratingLegend = document.getElementById('ratingLegend');
+    if (ratingLegend) ratingLegend.classList.remove('open');
   }
 
   // ---- Book Detail Modal ----
@@ -355,7 +636,7 @@
     if (book.dateCompleted) {
       fieldsHtml += `<div class="detail-field"><div class="detail-field-label">Date Completed</div><div class="detail-field-value">${book.dateCompleted}</div></div>`;
     }
-    if ((book.status === 'reading' || book.status === 'paused') && book.currentPage) {
+    if ((book.status === 'reading' || book.status === 'on-hold') && book.currentPage) {
       const progressStr = book.pageCount ? `${book.currentPage} / ${book.pageCount}` : `Page ${book.currentPage}`;
       fieldsHtml += `<div class="detail-field"><div class="detail-field-label">Progress</div><div class="detail-field-value">${progressStr}</div></div>`;
     }
@@ -408,7 +689,7 @@
     });
 
     document.getElementById('deleteBookBtn').addEventListener('click', () => {
-      if (confirm(`Delete "${book.title}"?`)) {
+      showConfirmDialog('Delete Book', `Are you sure you want to delete "${book.title}"?`, () => {
         books = books.filter(b => b.id !== id);
         saveBooks();
         closeModal('bookDetailModal');
@@ -416,7 +697,7 @@
         renderAll();
         updateStats();
         showToast('Book deleted');
-      }
+      });
     });
 
     openModal('bookDetailModal');
@@ -429,7 +710,7 @@
     document.getElementById('bookForm').reset();
     document.getElementById('formBookId').value = '';
     document.getElementById('olResults').innerHTML = '';
-    document.getElementById('formStatus').value = 'owned';
+    document.getElementById('formStatus').value = 'up-next';
     openModal('bookFormModal');
   }
 
@@ -442,7 +723,7 @@
     document.getElementById('formYear').value = book.yearPublished || '';
     document.getElementById('formPages').value = book.pageCount || '';
     document.getElementById('formFormat').value = book.format || '';
-    document.getElementById('formStatus').value = book.status || 'owned';
+    document.getElementById('formStatus').value = book.status || 'up-next';
     document.getElementById('formRating').value = book.rating || '';
     document.getElementById('formCover').value = book.coverImage || '';
     document.getElementById('formDatePurchased').value = book.datePurchased || '';
@@ -618,6 +899,29 @@
     }
   }
 
+  // ---- Confirm Dialog ----
+
+  function showConfirmDialog(title, message, onConfirm) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    openModal('confirmModal');
+
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    const deleteBtn = document.getElementById('confirmDeleteBtn');
+
+    // Clone and replace to remove old listeners
+    const newCancel = cancelBtn.cloneNode(true);
+    const newDelete = deleteBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+    deleteBtn.parentNode.replaceChild(newDelete, deleteBtn);
+
+    newCancel.addEventListener('click', () => closeModal('confirmModal'));
+    newDelete.addEventListener('click', () => {
+      closeModal('confirmModal');
+      onConfirm();
+    });
+  }
+
   // ---- Modal Helpers ----
 
   function openModal(id) {
@@ -634,7 +938,32 @@
 
   function bindEvents() {
     // Search
-    document.getElementById('searchInput').addEventListener('input', debounce(renderAll, 200));
+    document.getElementById('searchInput').addEventListener('input', debounce(() => {
+      renderAll();
+    }, 200));
+
+    // Clear Filters button
+    document.getElementById('clearFiltersBtn').addEventListener('click', clearAllFilters);
+
+    // Rating Legend toggle
+    document.getElementById('ratingLegendToggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const legend = document.getElementById('ratingLegend');
+      const isOpen = legend.classList.contains('open');
+      closeAllDropdowns();
+      if (!isOpen) legend.classList.add('open');
+    });
+
+    // View Toggle
+    document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentView = btn.dataset.view;
+        localStorage.setItem('reading-list-view', currentView);
+        document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderAll();
+      });
+    });
 
     // Filter pill toggles
     const pillConfigs = [
