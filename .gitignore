@@ -8,5 +8,8 @@
 .vscode/
 .idea/
 
+# Local docs
+harrys-reading-list-PRD-v2.md
+
 # Node (if tooling is ever added)
 node_modules/
