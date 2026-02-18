@@ -17,6 +17,9 @@
   // Book icon SVG for placeholder covers
   const BOOK_ICON_SVG = `<svg class="placeholder-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="12" y1="6" x2="12" y2="13"/><line x1="9" y1="10" x2="15" y2="10"/></svg>`;
 
+  // Admin mode: activated via ?admin=true in URL
+  const isAdmin = new URLSearchParams(window.location.search).get('admin') === 'true';
+
   let books = [];
   let currentDetailId = null;
 
@@ -98,6 +101,8 @@
   // ---- Initialization ----
 
   async function init() {
+    document.body.classList.add(isAdmin ? 'admin-mode' : 'public-mode');
+
     books = loadBooks();
 
     // If empty, load seed data
@@ -349,6 +354,7 @@
         <th class="book-list-col-rating${activeClass('rating')}" data-sort-col="rating">Rating${arrow('rating')}</th>
         <th class="book-list-col-status${activeClass('status')}" data-sort-col="status">Status${arrow('status')}</th>
         <th class="book-list-col-format${activeClass('format')}" data-sort-col="format">Format${arrow('format')}</th>
+        <th class="book-list-col-amazon"></th>
       </tr></thead><tbody>`;
 
     sorted.forEach(book => {
@@ -361,6 +367,7 @@
         <td class="book-list-col-rating">${ratingStr}</td>
         <td class="book-list-col-status"><span class="book-list-status-badge">${escapeHtml(statusLabel)}</span></td>
         <td class="book-list-col-format">${escapeHtml(book.format || '')}</td>
+        <td class="book-list-col-amazon"><a href="${amazonSearchUrl(book)}" target="_blank" rel="noopener noreferrer" class="amazon-link" title="Find on Amazon" onclick="event.stopPropagation()">${AMAZON_ICON_SVG}</a></td>
       </tr>`;
     });
 
@@ -408,10 +415,6 @@
       }
     }
 
-    const formatBadge = book.format
-      ? `<span class="format-badge">${formatIcon(book.format)}</span>`
-      : '';
-
     const genreHtml = book.genre ? `<span class="book-card-genre">${escapeHtml(book.genre)}</span>` : '';
 
     let ratingHtml = '';
@@ -431,14 +434,15 @@
       <div class="book-card" data-id="${book.id}"${needsCover ? ' data-needs-cover="true"' : ''}>
         <div class="book-card-cover">
           ${coverHtml}
-          ${formatBadge}
         </div>
         <div class="book-card-info">
           <div class="book-card-title">${escapeHtml(book.title)}</div>
           <div class="book-card-author">${escapeHtml(book.author)}</div>
           ${genreHtml}
-          ${ratingHtml}
-          ${progressHtml}
+          <div class="book-card-bottom">
+            <div class="book-card-bottom-left">${ratingHtml}${progressHtml}</div>
+            <a href="${amazonSearchUrl(book)}" target="_blank" rel="noopener noreferrer" class="amazon-link" title="Find on Amazon" onclick="event.stopPropagation()">${AMAZON_ICON_SVG}</a>
+          </div>
         </div>
       </div>`;
   }
@@ -455,16 +459,6 @@
     }
     html += '</div>';
     return html;
-  }
-
-  function formatIcon(format) {
-    switch (format) {
-      case 'Digital/Kindle': return 'Kindle';
-      case 'Audiobook': return 'Audio';
-      case 'Physical (New)': return 'New';
-      case 'Physical (Used)': return 'Used';
-      default: return format;
-    }
   }
 
   function updateStats() {
@@ -668,37 +662,40 @@
       ${fieldsHtml}
       ${notesHtml}
       <div class="detail-actions">
-        <select class="detail-status-select" id="detailStatusSelect">${statusOptions}</select>
+        ${isAdmin ? `<select class="detail-status-select" id="detailStatusSelect">${statusOptions}</select>
         <button class="btn btn-subtle btn-small" id="editBookBtn">Edit</button>
-        <button class="btn btn-danger btn-small" id="deleteBookBtn">Delete</button>
+        <button class="btn btn-danger btn-small" id="deleteBookBtn">Delete</button>` : ''}
+        <a href="${amazonSearchUrl(book)}" target="_blank" rel="noopener noreferrer" class="btn btn-subtle btn-small detail-amazon-link">Find on Amazon</a>
       </div>
     `;
 
-    // Bind detail actions
-    document.getElementById('detailStatusSelect').addEventListener('change', (e) => {
-      book.status = e.target.value;
-      saveBooks();
-      renderAll();
-      updateStats();
-      showToast(`Moved to ${STATUS_LABELS[book.status]}`);
-    });
-
-    document.getElementById('editBookBtn').addEventListener('click', () => {
-      closeModal('bookDetailModal');
-      openEditForm(book);
-    });
-
-    document.getElementById('deleteBookBtn').addEventListener('click', () => {
-      showConfirmDialog('Delete Book', `Are you sure you want to delete "${book.title}"?`, () => {
-        books = books.filter(b => b.id !== id);
+    // Bind detail actions (admin only)
+    if (isAdmin) {
+      document.getElementById('detailStatusSelect').addEventListener('change', (e) => {
+        book.status = e.target.value;
         saveBooks();
-        closeModal('bookDetailModal');
-        populateGenreFilter();
         renderAll();
         updateStats();
-        showToast('Book deleted');
+        showToast(`Moved to ${STATUS_LABELS[book.status]}`);
       });
-    });
+
+      document.getElementById('editBookBtn').addEventListener('click', () => {
+        closeModal('bookDetailModal');
+        openEditForm(book);
+      });
+
+      document.getElementById('deleteBookBtn').addEventListener('click', () => {
+        showConfirmDialog('Delete Book', `Are you sure you want to delete "${book.title}"?`, () => {
+          books = books.filter(b => b.id !== id);
+          saveBooks();
+          closeModal('bookDetailModal');
+          populateGenreFilter();
+          renderAll();
+          updateStats();
+          showToast('Book deleted');
+        });
+      });
+    }
 
     openModal('bookDetailModal');
   }
@@ -1064,6 +1061,12 @@
   }
 
   // ---- Utilities ----
+
+  function amazonSearchUrl(book) {
+    return `https://www.amazon.com/s?k=${encodeURIComponent(book.title + ' ' + book.author)}`;
+  }
+
+  const AMAZON_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.96 22.45c-1.79 1.2-4.38 1.84-6.61 1.84-3.13 0-5.95-1.16-8.08-3.08-.17-.15-.02-.36.18-.24 2.3 1.34 5.15 2.14 8.09 2.14 1.98 0 4.16-.41 6.17-1.26.3-.13.56.2.25.6zm.72-.82c-.23-.29-1.5-.14-2.07-.07-.17.02-.2-.13-.04-.24 1.01-.71 2.68-.51 2.87-.27.19.24-.05 1.92-.99 2.72-.15.12-.29.06-.22-.1.22-.54.7-1.75.45-2.04z"/><path d="M14.69 14.84c0 .65.02 1.19-.31 1.76-.27.47-.69.76-1.16.76-.64 0-1.02-.49-1.02-1.21 0-1.43 1.28-1.69 2.49-1.69v.38zm1.69 4.09c-.11.1-.27.11-.4.04-.56-.46-.66-.68-.96-1.12-1.04 1.06-1.78 1.38-3.13 1.38-1.6 0-2.84-.99-2.84-2.96 0-1.54.84-2.59 2.03-3.1 1.03-.45 2.48-.53 3.58-.66v-.25c0-.45.03-.98-.23-1.37-.23-.35-.67-.49-1.06-.49-.72 0-1.36.37-1.52 1.14-.03.17-.16.34-.34.35l-1.88-.2c-.15-.03-.33-.16-.28-.4.42-2.22 2.42-2.89 4.22-2.89.92 0 2.12.24 2.84.94.92.86.84 2.01.84 3.26v2.95c0 .89.37 1.28.71 1.76.12.17.15.38-.01.51-.4.33-1.11.95-1.5 1.3l-.07-.04z"/></svg>';
 
   function generateId() {
     return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

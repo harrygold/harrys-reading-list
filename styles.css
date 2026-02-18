@@ -502,19 +502,6 @@ body {
   opacity: 0.35;
 }
 
-.format-badge {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: rgba(255,255,255,0.92);
-  backdrop-filter: blur(8px);
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
 .book-card-info {
   padding: 0.85rem 1rem;
   flex: 1;
@@ -938,6 +925,44 @@ body {
   margin: 0.75rem 0;
 }
 
+/* ---- Amazon Link ---- */
+.amazon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  transition: color var(--transition);
+  flex-shrink: 0;
+}
+
+.amazon-link:hover {
+  color: #1a1a1a;
+}
+
+.book-card-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: auto;
+}
+
+.book-card-bottom-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-amazon-link {
+  margin-left: auto;
+  text-decoration: none;
+}
+
+/* ---- List View Amazon Column ---- */
+.book-list-col-amazon {
+  width: 36px;
+  text-align: center;
+}
+
 /* ---- Genre Tag on Cards ---- */
 .book-card-genre {
   font-size: 11px;
@@ -1103,10 +1128,10 @@ body {
 }
 
 /* Column widths — proportional via percentages */
-.book-list-col-title { width: 30%; font-weight: 500; }
-.book-list-col-author { width: 20%; color: var(--color-text-secondary); }
+.book-list-col-title { width: 28%; font-weight: 500; }
+.book-list-col-author { width: 19%; color: var(--color-text-secondary); }
 .book-list-col-genre { width: 15%; color: var(--color-text-secondary); }
-.book-list-col-rating { width: 15%; }
+.book-list-col-rating { width: 14%; }
 .book-list-col-status { width: 10%; }
 .book-list-col-format { width: 10%; color: var(--color-text-secondary); font-size: 12px; }
 
@@ -1144,6 +1169,30 @@ body {
 
 .clear-filters-link:hover {
   text-decoration: underline;
+}
+
+/* ---- Admin / Public Mode ---- */
+.public-mode #addBookBtn,
+.public-mode .overflow-menu-container {
+  display: none;
+}
+
+.admin-indicator {
+  display: none;
+}
+
+.admin-mode .admin-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 11px;
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.admin-indicator svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* ---- Footer ---- */
@@ -1267,7 +1316,8 @@ body {
   }
 
   .book-list-col-genre,
-  .book-list-col-format {
+  .book-list-col-format,
+  .book-list-col-amazon {
     display: none;
   }
 
