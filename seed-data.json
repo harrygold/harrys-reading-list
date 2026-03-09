@@ -2227,5 +2227,30 @@
     "notes": "",
     "description": "",
     "dateAdded": "2026-02-18"
+  },
+  {
+    "id": "bmmim60imv4qq",
+    "title": "Who Knew",
+    "author": "Barry Diller",
+    "genre": "Biography",
+    "yearPublished": 2025,
+    "pageCount": null,
+    "coverImage": "https://m.media-amazon.com/images/I/71+pR8yIeDL._SL1500_.jpg",
+    "format": "Physical (New)",
+    "status": "reading",
+    "datePurchased": "",
+    "dateStarted": "",
+    "dateCompleted": "",
+    "currentPage": null,
+    "rating": null,
+    "favorite": false,
+    "tags": [
+      "Hollywood",
+      "Show Business"
+    ],
+    "recommendedBy": "Rick Rubin",
+    "notes": "",
+    "description": "",
+    "dateAdded": "2026-03-09"
   }
 ]
