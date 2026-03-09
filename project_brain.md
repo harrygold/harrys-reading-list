@@ -1,7 +1,7 @@
 # Project Brain — Harry's Reading List
 
 > Single source of truth for the architecture, features, and conventions of this project.
-> Last updated: 2026-02-17
+> Last updated: 2026-02-18
 
 ---
 
@@ -25,7 +25,8 @@ It's designed to be a polished, self-contained static site with no backend.
 | **Book search** | Open Library Search API | Used in add/edit form to auto-fill metadata |
 | **Build tools** | None | Open `index.html` directly or serve with any static server |
 | **Tests** | None yet | — |
-| **Deployment** | Not configured | Static files, deployable anywhere |
+| **Deployment** | GitHub Pages | https://harrygold.github.io/harrys-reading-list/ |
+| **Repository** | GitHub | https://github.com/harrygold/harrys-reading-list |
 
 ### File Structure
 
