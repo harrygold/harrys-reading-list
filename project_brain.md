@@ -1,7 +1,7 @@
 # Project Brain — Harry's Reading List
 
 > Single source of truth for the architecture, features, and conventions of this project.
-> Last updated: 2026-02-18
+> Last updated: 2026-03-09
 
 ---
 
@@ -157,6 +157,10 @@ Each book is a plain JSON object with this schema:
 - In the detail modal, ratings are shown regardless of status (if set).
 - The rating guide maps: 5=Exceptional, 4=Really Good, 3=Good Read, 2=Not Great, 1=Skip It.
 
+### About Section (Header)
+- The "About Harry Gold" `<details>` element is **expanded by default** (`open` attribute set).
+- Author names use full proper names: **Gabriel García Márquez**, **Kazuo Ishiguro**, **Somerset Maugham**.
+
 ### ID Generation
 - IDs are client-generated strings: `'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,6)`.
 - Seed data uses sequential IDs (`b001`–`b097`).
@@ -166,6 +170,7 @@ Each book is a plain JSON object with this schema:
 - **Grid view** uses the global sort pill (defaults to Date Added, descending).
 - **List view** has its own independent sort state (column + direction), defaulting to Title ascending.
 - These two sort states are independent and do not affect each other.
+- **Finished section** has its own fixed default sort: rating descending (5 stars first), then alphabetically by title within each rating tier. Unrated books appear last, also alphabetically. This sort is applied after the global filter and overrides the global sort for that section only.
 
 ---
 

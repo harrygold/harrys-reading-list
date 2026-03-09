@@ -147,7 +147,14 @@
     const owned = filtered.filter(b => b.status === 'up-next');
     const wantToBuy = filtered.filter(b => b.status === 'wishlist');
     const paused = filtered.filter(b => b.status === 'on-hold');
-    const completed = filtered.filter(b => b.status === 'finished' && !b.favorite);
+    const completedRaw = filtered.filter(b => b.status === 'finished' && !b.favorite);
+    const completed = [...completedRaw].sort((a, b) => {
+      if (a.rating == null && b.rating == null) return a.title.localeCompare(b.title);
+      if (a.rating == null) return 1;
+      if (b.rating == null) return -1;
+      if (b.rating !== a.rating) return b.rating - a.rating;
+      return a.title.localeCompare(b.title);
+    });
 
     const renderFn = currentView === 'list' ? renderList : renderGrid;
 
